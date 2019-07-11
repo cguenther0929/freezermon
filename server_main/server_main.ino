@@ -47,8 +47,6 @@ bool            timer_pause_2 = false;
 long            seconds_counter = 0;        //32bit value 4.264....e9
 
 //TEMPERATURE AND POWER
-// float           temp_buffer[8];                       // Keep FIFO buffer for temperature averaging
-// int             circle_buf_ptr = 0;                   // Keep track of which sample to 
 float           global_temp_flt = -0.0;               //Value updated during analog read of temperature
 bool            debug_print = true;                   // Set this to true when we want to print debug messages
 
@@ -227,18 +225,6 @@ float get_temperature(void) {
   
   temp_value = float((temp_value * 1.8) + 32);
 
-  // temp_buffer[circle_buf_ptr] = temp_value;
-  
-  // (circle_buf_ptr >= 7) ? (circle_buf_ptr = 0):(circle_buf_ptr++);
-
-  // temp_sum = 0.0;   // Reset this value in preparation to calculate the average
-  
-  // for(i=0; i<8; i++) {
-  //   temp_sum += temp_buffer[i];
-  // }
-
-  // temp_value = float(temp_sum / 8);
-
   return(temp_value);
 
 }
@@ -301,7 +287,6 @@ void loop(void)
 
   if(Timer500msFlag == true) {
     Timer500msFlag = false;
-    // global_temp_flt = get_temperature();
   }
 
   if(Timer1000msFlag == true) {
@@ -318,7 +303,6 @@ void loop(void)
     global_temp_flt = get_temperature();
     
     //Check to see if the temperature value is above the set threshold.  Do not care if freezer temp is negative since trip point will always be zero or positive
-    // ((global_temp_flt > trip_pt_flt) & !temp_is_neg) ? (temp_is_critical = true):(temp_is_critical = false);
     ((global_temp_flt > trip_pt_flt)) ? (temp_is_critical = true):(temp_is_critical = false);
     
     if(debug_print) {

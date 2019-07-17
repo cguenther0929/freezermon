@@ -51,6 +51,7 @@ const char* Gsender::getError()
 bool Gsender::Send(const String &to, const String &message)
 {
   WiFiClientSecure client;
+  client.setInsecure();
 #if defined(GS_SERIAL_LOG_2)
   Serial.print("Connecting to :");
   Serial.println(SMTP_SERVER);  

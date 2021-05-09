@@ -376,8 +376,7 @@ void loop(void)
       email_body =  "Temp critical: " + (String)global_temp_flt + 
                     "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
       if(
-        (gsender->Subject(subject)->Send("meghanspindler12@hotmail.com", email_body)) &
-        (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
+          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
         ) 
       {
           __asm__("nop\n\t");
@@ -396,8 +395,7 @@ void loop(void)
                     "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
       
       if(
-        (gsender->Subject(subject)->Send("meghanspindler12@hotmail.com", email_body)) &
-        (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
+          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
         ) 
       {
         __asm__("nop\n\t");
@@ -433,8 +431,7 @@ void loop(void)
       email_body = "Freezer alarm rebooted.";
       
       if(
-        (gsender->Subject(subject)->Send("meghanspindler12@hotmail.com", email_body)) &
-        (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
+          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
         ) 
       {
         __asm__("nop\n\t");

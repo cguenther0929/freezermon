@@ -8,3 +8,5 @@ v1.0 : This version has been running on the freezer monitor for quite some time.
 v1.1 : Added filtering to measurements.  Added a button to send a test email, but that feature remains untested.  At the time of uploading these changes, the mail server was down, and emails were not sending. 
 
 V1.2 : Corrected the issue with not being able to send emails by adding client.setInsecure() in Gsender.cpp.  The test email button present on the web interface remains untested and seemingly inoperable.  
+
+V1.3 : Remove ex-wife (Meghan Spindler) from freezer messages.  

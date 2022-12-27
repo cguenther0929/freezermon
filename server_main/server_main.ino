@@ -2,13 +2,10 @@
  * This is the FW for the freezer alaram.  Internal freezer temperature is monitored
  * and if the temperature falls below the trip point, the alarm will alert the user 
  * via email.  The alarm will also serve up a web page allowing real time statistics 
- * to be viewed, and parameters to be adjusted.  
+ * to be viewed, and parameters to be adjusted. 
  * 
- * My home router will be set up to forward on port 301.  So let's assume my IP address
- * from the ISP is 24.217.178.109.  From the browser, enter IP address 24.217.178.109:301
- * From time-to-time, it may be necessary to visit site "what's my IP", since I do not 
- * pay for a static IP address.  In the future, it's probably worth looking into the 
- * NO-IP DNS service.  
+ * TODO: The handling of the "Test Email" feature is 
+ * pretty crude, and should possibly be improved upon 
  * 
 */
 
@@ -17,7 +14,50 @@
 #include <ESP8266WebServer.h>
 #include <Ticker.h>
 #include <SPI.h>
-#include "Gsender.h"
+
+
+/**
+ * @brief SW Version Info
+ * 
+ */
+#define SW_VERSION              2.0
+ 
+/**
+ * Uncomment the following 
+ * if you wish to have logging 
+ * data printed to the screen
+ */
+#define ENABLE_LOGGING            true
+
+/**
+ * WiFi Parameters
+ */
+#define WIFI_CONNECT_TIMEOUT_S    10
+WiFiClient client;
+
+/**
+ * Email related parameters
+ */
+String    subject       = "";
+String    email_body    = "";
+char email_server[] = "mail.smtp2go.com";     // smtp2go email server
+
+/* BASE 64 Encoded SMTP2GO User Account */
+char buf_hyg_smtp2go_account[] = "Y2xpbnRvbi5ndWVudGhlckBnbWFpbC5jb20=";
+
+/* BASE 64 Encoded SMTP2GO User Password */
+char buf_hyg_smtp2go_password[] = "TUolZGZoKiY0NQ==";
+
+/* Recipient's email address  */
+char buf_recipient_email_addr[] = "clinton.guenther@gmail.com";
+
+/* Source email address */
+char buf_sender_email_addr[] = "clinton.debug@gmail.com";
+
+
+
+#define TEMP_BUF_SIZE             64    // Size of the temporary buffer
+char buf_temp[TEMP_BUF_SIZE];           // Temporary buffer that can be used for building strings
 
 // Fill in your WiFi router SSID and pass mword
 const char*     ssid = "CJG_GbE_2G4";           //My Home Router SSID
@@ -50,7 +90,6 @@ long            seconds_counter = 0;        //32bit value 4.264....e9
 float           temp_buffer[8];                       // Keep FIFO buffer for temperature averaging
 int             circle_buf_ptr = 0;                   // Keep track of which sample to 
 float           global_temp_flt = -0.0;               //Value updated during analog read of temperature
-bool            debug_print = true;                   // Set this to true when we want to print debug messages
 
 bool            critical_condition_detected = false;      // Send immediate warning if freezer temp is critical, but then send periodic after that
 bool            initial_warning_sent = false;             //This flag is set only inside the loop whose job is to send warning emails
@@ -89,13 +128,37 @@ void ICACHE_RAM_ATTR onTimerISR(){
 
 void handleRoot()
 {
-  Gsender *gsender = Gsender::Instance();
-  if (server.hasArg("trip_pt")) {
+  String argument_message = "";
+
+  #if defined (ENABLE_LOGGING)
+    for (int i = 0; i < server.args(); i++) {
+      argument_message += "Arg no" + (String)i + " –> ";
+      argument_message += server.argName(i) + ": ";
+      argument_message += server.arg(i) + "\n";
+    } 
+      Serial.print("***DEBUG "); Serial.println(argument_message);
+  #endif
+
+  if (server.hasArg("email_test")) {
+
+    #if defined (ENABLE_LOGGING)
+      Serial.println("****Sending test email "); 
+    #endif
+    
+    #if defined (ENABLE_LOGGING)
+      Serial.println("****DEBUG Refreshing browser.");
+    #endif
+    RefreshPage();            
+    server.send(200, "text/html", html_string);
+    
+    email_body =  "Just a test email.";
+    send_email_message();
+  }
+
+  else if (server.hasArg("trip_pt")) {
     handleSubmit();
   }
-  else if(server.hasArg("email_test")) {
-    gsender->Subject("Test Email")->Send("clinton.guenther@gmail.com", "Freezer Alarm Test Email");
-  }
+  
   else {
     RefreshPage();            
     server.send(200, "text/html", html_string);
@@ -108,6 +171,7 @@ void returnFail(String msg)
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(500, "text/plain", msg + "\r\n");
 }
+
 
 void handleSubmit()
 {
@@ -126,10 +190,10 @@ void handleSubmit()
 
 
   //Action taken, now refresh browser
-  if(debug_print) {
+  #if defined (ENABLE_LOGGING)
     Serial.print("****DEBUG Trip Point Updated Value: "); Serial.println(trip_pt_flt);
     Serial.println("****DEBUG Refreshing browser.");
-  }
+  #endif
   
   RefreshPage();
   server.send(200, "text/html", html_string);
@@ -144,7 +208,6 @@ void returnOK()
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "text/plain", "OK\r\n");
 }
-
 
 void handleNotFound()
 {
@@ -162,7 +225,6 @@ void handleNotFound()
   server.send(404, "text/plain", message);
 }
 
-
 void RefreshPage (void) {
   html_string = "<!DOCTYPE HTML>";
   html_string += "<html>";
@@ -175,17 +237,22 @@ void RefreshPage (void) {
   html_string += "</head>";
   html_string += "<body>";
   html_string += "<h1>CJG Freezer Monitor</h1>";
+  html_string += "<h3>SW Version " + String(SW_VERSION) + " </h3>";   
   html_string += "<FORM action=\"/\" method=\"post\">";
   html_string += "<P>";
   html_string += "Current Temperature: " + String(global_temp_flt) + " &#176F";
   html_string += "<br>";
   html_string += "Critical Temp Setting: " + String(trip_pt_flt) + " &#176F";
   html_string += "<br><br>";
+  
   html_string += "Update Trip Point: <INPUT type=\"text\" name=\"trip_pt\" size=\"5\" value=\"" + (String)trip_pt_flt + "\"<br>";
   html_string += "<br><br>";
-  html_string += "<INPUT type=\"submit\" value=\"Update\">";
+  html_string += "<input type=\"submit\" name=\"action\" value=\"Update\">";
+  
+  /* Test Email Button */
   html_string += "<br><br>";
-  html_string += "<INPUT type=\"submit\" name=\"email_test\" value=\"Test Email\">";
+  html_string += "<button name = \"email_test\" value = \"email_test\" type = \"submit\">Email Test</button>";
+  
   html_string += "</P>";
   html_string += "</FORM>";
   html_string += "</body>";
@@ -287,17 +354,14 @@ void setup(void) {
   timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
   timer1_write(tmr1_write_val);        //.05s 
 
-  if(debug_print) {
+  #if defined(ENABLE_LOGGING) 
     Serial.println("****DEBUG Rebooted");
-  }
+  #endif
 
 }
 
 void loop(void)
 {
-  String    subject       = "";
-  String    email_body    = "";
-  
 
   server.handleClient();
 
@@ -321,20 +385,25 @@ void loop(void)
   if(seconds_counter % 5 == 0 & timer_pause_2 == false) {                  // Check temperature and power status
     timer_pause_2 = true;
     
-    // global_temp_flt = get_temperature();
     
-    //Check to see if the temperature value is above the set threshold.  Do not care if freezer temp is negative since trip point will always be zero or positive
-    // ((global_temp_flt > trip_pt_flt) & !temp_is_neg) ? (temp_is_critical = true):(temp_is_critical = false);
+    /**
+     * Check to see if the temperature value is above the set threshold.  
+     * Do not care if freezer temp is negative since trip point
+     *  will always be zero or positive 
+     */
     ((global_temp_flt > trip_pt_flt)) ? (temp_is_critical = true):(temp_is_critical = false);
     
-    if(debug_print) {
+    #if defined(ENABLE_LOGGING) 
       Serial.print("****DEBUG Temp:"); Serial.println(global_temp_flt);
       if(temp_is_critical)
         Serial.println("****DEBUG Temp critical");
-    }
+    #endif
       
 
-    //Check power (AC Mains) status
+    /**
+     * @brief Check AC Mains Power
+     * 
+     */
     pwr_is_good = digitalRead(PWR_GOOD);   
 
     if((temp_is_critical | !pwr_is_good)) {  
@@ -361,30 +430,27 @@ void loop(void)
     timer_pause_1 = true;  
     initial_warning_sent = true;              //Initial warning sent, so set flag to prevent subsequent messages
 
-    if(debug_print)
-    {
+    #if defined(ENABLE_LOGGING)
       Serial.println("****DEBUG Email sending loop");  
       Serial.println("****DEBUG Seconds Counter: " + String(seconds_counter));  
-    }
-      
+    #endif
 
-    Gsender *gsender = Gsender::Instance();    // Getting pointer to class instance
-
-    // Temp critical, so send email
+    /**
+     * @brief Temp Critical, Send Email
+     */
     if(temp_is_critical) {
-      subject = "Freezer Temp Critical";
       email_body =  "Temp critical: " + (String)global_temp_flt + 
                     "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
-      if(
-          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
-        ) 
-      {
-          __asm__("nop\n\t");
-      } 
       
+      if(send_email_message()) {
+        #if defined(ENABLE_LOGGING)
+          Serial.println("Critical temp email successfully sent.");
+        #endif
+      }
       else {
-        Serial.print("Error sending message: ");
-        Serial.println(gsender->getError());
+        #if defined(ENABLE_LOGGING)
+          Serial.println("Critical temp email failed.");
+        #endif
       }
     }
 
@@ -394,55 +460,53 @@ void loop(void)
       email_body =  "AC mains power is down.\r\nCurrent Freezer Temp: " + (String)global_temp_flt + 
                     "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
       
-      if(
-          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
-        ) 
-      {
-        __asm__("nop\n\t");
-      } 
-      
+      if(send_email_message()) {
+        #if defined(ENABLE_LOGGING)
+          Serial.println("AC Mains email successfully sent.");
+        #endif
+
+      }
       else {
-        Serial.print("Error sending message: ");
-        Serial.println(gsender->getError());
+        #if defined(ENABLE_LOGGING)
+          Serial.println("AC Mains email failed.");
+        #endif
       }
     }
     
     // Everything normal, so send heartbeat email  
     else {
-      subject = "Freezer Heartbeat";
       email_body =  "Freezer alarm healthy. Current temp: " + (String)global_temp_flt + 
                     "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
-      if(
-        (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
-        ) 
-      {
-        __asm__("nop\n\t");
-      } 
       
+      if(send_email_message()) {
+      #if defined(ENABLE_LOGGING)
+        Serial.println("Heartbeat email successfully sent.");
+      #endif
+
+      }
       else {
-        Serial.print("Error sending message: ");
-        Serial.println(gsender->getError());
+        #if defined(ENABLE_LOGGING)
+          Serial.println("Heartbeat email failed.");
+        #endif
       }
     }
     
     // Freezer alarm just rebooted
     if(reboot_POST == false) {
-      subject = "Freezer Alarm Reboot";
       email_body = "Freezer alarm rebooted.";
       
-      if(
-          (gsender->Subject(subject)->Send("clinton.guenther@gmail.com", email_body))
-        ) 
-      {
-        __asm__("nop\n\t");
-      } 
-      
+      if(send_email_message()) {
+      #if defined(ENABLE_LOGGING)
+        Serial.println("Reboot POST email successfully sent.");
+      #endif
+
+      }
       else {
-        Serial.print("Error sending message: ");
-        Serial.println(gsender->getError());
+        #if defined(ENABLE_LOGGING)
+        Serial.println("Reboot POST email failed.");
+        #endif
       }
       reboot_POST = true;     // Set flag that indicates we've sent the reboot post.  
-
     }
 
   }

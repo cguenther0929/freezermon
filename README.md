@@ -19,3 +19,5 @@ V1.2 : Corrected the issue with not being able to send emails by adding client.s
 V1.3 : Remove ex-wife (Meghan Spindler) from freezer messages.  
 
 V2.0 : Modified email sending algorithm such that it now leverages SMTP2GO to send email since Google dropped support for less secure apps. The Test Email button is now functional.
+
+V2.1 : Modified the email text so that degrees Fahrenheit will be properly displayed when viewing the email.  

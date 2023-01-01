@@ -20,7 +20,7 @@
  * @brief SW Version Info
  * 
  */
-#define SW_VERSION              2.0
+#define SW_VERSION              2.1
  
 /**
  * Uncomment the following 
@@ -440,7 +440,7 @@ void loop(void)
      */
     if(temp_is_critical) {
       email_body =  "Temp critical: " + (String)global_temp_flt + 
-                    "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
+                    "\u00B0 F (critical trip point set to: " + (String)trip_pt_flt + "\u00B0 F).";
       
       if(send_email_message()) {
         #if defined(ENABLE_LOGGING)
@@ -458,7 +458,7 @@ void loop(void)
     else if(!pwr_is_good) {
       subject = "AC Mains Power Down";
       email_body =  "AC mains power is down.\r\nCurrent Freezer Temp: " + (String)global_temp_flt + 
-                    "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
+                    "\u00B0 F (critical trip point set to: " + (String)trip_pt_flt + "\u00B0 F).";
       
       if(send_email_message()) {
         #if defined(ENABLE_LOGGING)
@@ -476,7 +476,7 @@ void loop(void)
     // Everything normal, so send heartbeat email  
     else {
       email_body =  "Freezer alarm healthy. Current temp: " + (String)global_temp_flt + 
-                    "&#176F (critical trip point set to: " + (String)trip_pt_flt + "&#176F).";
+                    "\u00B0 F (critical trip point set to: " + (String)trip_pt_flt + "\u00B0 F).";
       
       if(send_email_message()) {
       #if defined(ENABLE_LOGGING)
